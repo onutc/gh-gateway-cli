@@ -23,6 +23,7 @@ func Test_helperRun(t *testing.T) {
 		name       string
 		opts       CredentialOptions
 		input      string
+		env        map[string]string
 		wantStdout string
 		wantStderr string
 		wantErr    bool
@@ -218,6 +219,52 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "http gateway host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                      "GH_GATEWAY_RUNTIME_EXCHANGE_URL",
+						"gateway.internal:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=http
+				host=gateway.internal
+			`),
+			env: map[string]string{
+				"GH_REST_BASE_URL": "http://gateway.internal/api/v3/",
+			},
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=http
+				host=gateway.internal
+				username=x-access-token
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "http host without configured gateway",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                      "GH_GATEWAY_RUNTIME_EXCHANGE_URL",
+						"gateway.internal:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=http
+				host=gateway.internal
+			`),
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
 			name: "noop store operation",
 			opts: CredentialOptions{
 				Operation: "store",
@@ -241,6 +288,9 @@ func Test_helperRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, stdin, stdout, stderr := iostreams.Test()
 			fmt.Fprint(stdin, tt.input)
+			for key, value := range tt.env {
+				t.Setenv(key, value)
+			}
 			opts := &tt.opts
 			opts.IO = ios
 			if err := helperRun(opts); (err != nil) != tt.wantErr {
