@@ -32,7 +32,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/go-version v1.8.0
 	github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec
-	github.com/in-toto/attestation v1.1.2
+	github.com/in-toto/attestation v1.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/klauspost/compress v1.18.5
