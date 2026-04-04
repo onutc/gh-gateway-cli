@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+
+	"github.com/cli/cli/v2/internal/gatewayconfig"
 )
 
 // DefaultHostname is the domain name of the default GitHub instance.
@@ -44,6 +46,9 @@ func HostnameValidator(hostname string) error {
 }
 
 func GraphQLEndpoint(hostname string) string {
+	if override := gatewayconfig.GraphQLURL(); override != "" {
+		return override
+	}
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
@@ -57,6 +62,9 @@ func GraphQLEndpoint(hostname string) string {
 }
 
 func RESTPrefix(hostname string) string {
+	if override := gatewayconfig.RESTBaseURL(); override != "" {
+		return override
+	}
 	if isGarage(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
@@ -70,6 +78,9 @@ func RESTPrefix(hostname string) string {
 }
 
 func GistPrefix(hostname string) string {
+	if override := gatewayconfig.BrowserBaseURL(); override != "" {
+		return override + "gist/"
+	}
 	prefix := "https://"
 	if strings.EqualFold(hostname, localhost) {
 		prefix = "http://"
@@ -91,6 +102,9 @@ func GistHost(hostname string) string {
 }
 
 func HostPrefix(hostname string) string {
+	if override := gatewayconfig.BrowserBaseURL(); override != "" {
+		return override
+	}
 	if strings.EqualFold(hostname, localhost) {
 		return fmt.Sprintf("http://%s/", hostname)
 	}

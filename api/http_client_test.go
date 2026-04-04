@@ -21,6 +21,7 @@ func TestNewHTTPClient(t *testing.T) {
 		config             tokenGetter
 		appVersion         string
 		invokingAgent      string
+		authScheme         string
 		logVerboseHTTP     bool
 		skipDefaultHeaders bool
 	}
@@ -56,6 +57,22 @@ func TestNewHTTPClient(t *testing.T) {
 			host: "example.com",
 			wantHeader: map[string][]string{
 				"authorization":        {"token GHETOKEN"},
+				"user-agent":           {"GitHub CLI v1.2.3"},
+				"x-github-api-version": {"2022-11-28"},
+				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
+			},
+			wantStderr: "",
+		},
+		{
+			name: "custom bearer auth scheme",
+			args: args{
+				config:     tinyConfig{"example.com:oauth_token": "GHETOKEN"},
+				appVersion: "v1.2.3",
+				authScheme: "bearer",
+			},
+			host: "example.com",
+			wantHeader: map[string][]string{
+				"authorization":        {"Bearer GHETOKEN"},
 				"user-agent":           {"GitHub CLI v1.2.3"},
 				"x-github-api-version": {"2022-11-28"},
 				"accept":               {"application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview"},
@@ -179,6 +196,10 @@ func TestNewHTTPClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.args.authScheme != "" {
+				t.Setenv("GH_AUTH_SCHEME", tt.args.authScheme)
+			}
+
 			ios, _, _, stderr := iostreams.Test()
 			client, err := NewHTTPClient(HTTPClientOptions{
 				AppVersion:         tt.args.appVersion,

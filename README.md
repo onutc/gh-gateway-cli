@@ -1,4 +1,52 @@
-# GitHub CLI
+# gh-gateway-cli
+
+`gh-gateway-cli` is a configurable derivative of GitHub CLI for environments
+that need to talk to GitHub-compatible gateways instead of talking directly to
+GitHub.
+
+The shipped binary is still `gh`. The goal of this repo is to keep the normal
+GitHub CLI behavior where possible, while adding generic configuration hooks for
+gatewayed environments such as:
+
+- a custom REST base URL
+- a custom GraphQL base URL
+- a custom browser base URL
+- dynamic token retrieval through a command or helper binary
+
+This repo is intentionally gateway-oriented, but not TextCortex-specific. It is
+meant to be useful anywhere a GitHub-compatible HTTP gateway sits between the
+CLI and the upstream GitHub API.
+
+## Goal
+
+`gh-gateway-cli` exists to make `gh` usable in constrained runtime environments
+without carrying a one-off wrapper per platform. The immediate use case is
+agent/devbox-style environments where:
+
+- HTTPS may terminate at a gateway instead of GitHub directly
+- the reachable API base URL is not the standard `https://api.<host>/`
+- tokens are short-lived and should be sourced dynamically
+- Git remotes still look like normal GitHub remotes
+
+The current gateway-specific configuration surface is environment-driven:
+
+- `GH_REST_BASE_URL`
+- `GH_GRAPHQL_BASE_URL`
+- `GH_BROWSER_BASE_URL`
+- `GH_AUTH_SCHEME`
+- `GH_TOKEN_COMMAND`
+- `GH_GATEWAY_HELPER`
+
+`GH_AUTH_SCHEME` accepts `token`, `bearer`, or `basic`. This is useful when a
+gateway expects a different `Authorization` header format than GitHub’s default
+`token <value>` style. For example, JWT-backed gateways commonly need
+`GH_AUTH_SCHEME=bearer`.
+
+When a `gh-gateway-helper` executable is present on `PATH`, the CLI can also
+discover the gateway base URL and token automatically through helper commands.
+
+This project tracks upstream GitHub CLI closely and aims to keep changes small,
+reviewable, and generally useful.
 
 `gh` is GitHub on the command line. It brings pull requests, issues, and other GitHub concepts to the terminal next to where you are already working with `git` and your code.
 

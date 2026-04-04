@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/gatewayconfig"
 	"github.com/cli/cli/v2/utils"
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
@@ -109,12 +110,23 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 			if !redirectHostnameChange {
 				hostname := ghauth.NormalizeHostname(getHost(req))
 				if token, _ := cfg.ActiveToken(hostname); token != "" {
-					req.Header.Set(authorization, fmt.Sprintf("token %s", token))
+					req.Header.Set(authorization, authorizationHeaderValue(token))
 				}
 			}
 		}
 		return rt.RoundTrip(req)
 	}}
+}
+
+func authorizationHeaderValue(token string) string {
+	switch gatewayconfig.AuthorizationScheme() {
+	case "basic":
+		return fmt.Sprintf("Basic %s", token)
+	case "bearer":
+		return fmt.Sprintf("Bearer %s", token)
+	default:
+		return fmt.Sprintf("token %s", token)
+	}
 }
 
 // ExtractHeader extracts a named header from any response received by this client and,

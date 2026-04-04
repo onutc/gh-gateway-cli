@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/cli/cli/v2/internal/gatewayconfig"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/internal/keyring"
 	o "github.com/cli/cli/v2/pkg/option"
@@ -234,6 +235,9 @@ func (c *AuthConfig) ActiveToken(hostname string) (string, string) {
 	}
 	token, source := ghauth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
+		token, source = gatewayconfig.ActiveToken()
+	}
+	if token == "" {
 		var user string
 		var err error
 		if user, err = c.ActiveUser(hostname); err == nil {
@@ -277,6 +281,9 @@ func (c *AuthConfig) HasEnvToken() bool {
 	// can guarantee that tokens will only be returned from a set env var.
 	// Discussed here, but maybe worth revisiting: https://github.com/cli/cli/pull/7169#discussion_r1136979033
 	token, _ := ghauth.TokenFromEnvOrConfig(hostname)
+	if token == "" {
+		token, _ = gatewayconfig.ActiveToken()
+	}
 	return token != ""
 }
 
