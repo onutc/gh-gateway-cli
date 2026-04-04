@@ -22,10 +22,10 @@ const (
 	envTokenCachePath          = "GH_GATEWAY_TOKEN_CACHE_PATH"
 	envTokenRefreshSkewSeconds = "GH_GATEWAY_TOKEN_REFRESH_SKEW_SECONDS"
 
-	defaultSubjectTokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	defaultTokenRefreshSkew  = 60 * time.Second
-	defaultGatewayCacheFile  = "gh-gateway-cli-access.json"
-	defaultExchangeTimeout   = 10 * time.Second
+	defaultSubjectTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	defaultTokenRefreshSkew = 60 * time.Second
+	defaultGatewayCacheFile = "gh-gateway-cli-access.json"
+	defaultExchangeTimeout  = 10 * time.Second
 )
 
 type runtimeExchangeConfig struct {
@@ -45,13 +45,13 @@ type cachedGatewayAccess struct {
 }
 
 type runtimeExchangeDeps struct {
-	getenv   func(string) string
-	readFile func(string) ([]byte, error)
+	getenv    func(string) string
+	readFile  func(string) ([]byte, error)
 	writeFile func(string, []byte, os.FileMode) error
-	mkdirAll func(string, os.FileMode) error
-	rename   func(string, string) error
-	now      func() time.Time
-	client   *http.Client
+	mkdirAll  func(string, os.FileMode) error
+	rename    func(string, string) error
+	now       func() time.Time
+	client    *http.Client
 }
 
 func defaultRuntimeExchangeDeps() runtimeExchangeDeps {
