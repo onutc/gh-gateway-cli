@@ -136,6 +136,9 @@ func gatewayBaseURL() string {
 	if explicit := trimmedEnv(envGraphQLBaseURL); explicit != "" {
 		return deriveGatewayBaseURL(explicit)
 	}
+	if builtInBaseURL := builtInGatewayBaseURL(); builtInBaseURL != "" {
+		return builtInBaseURL
+	}
 	if helperBase := runHelperCommand("gateway-base-url"); helperBase != "" {
 		return ensureTrailingSlash(helperBase)
 	}
@@ -180,6 +183,9 @@ func ActiveToken() (string, string) {
 		if token := runShellCommand(command); token != "" {
 			return token, envTokenCommand
 		}
+	}
+	if token, source := builtInActiveToken(); token != "" {
+		return token, source
 	}
 	if token := runHelperCommand("token"); token != "" {
 		return token, envGatewayHelper

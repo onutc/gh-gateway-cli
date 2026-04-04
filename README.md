@@ -36,14 +36,26 @@ The current gateway-specific configuration surface is environment-driven:
 - `GH_AUTH_SCHEME`
 - `GH_TOKEN_COMMAND`
 - `GH_GATEWAY_HELPER`
+- `GH_GATEWAY_RUNTIME_EXCHANGE_URL`
+- `GH_GATEWAY_ACCESS_EXCHANGE_URL`
+- `GH_GATEWAY_INSTANCE_ID`
+- `GH_GATEWAY_SUBJECT_TOKEN_FILE`
+- `GH_GATEWAY_TOKEN_CACHE_PATH`
 
 `GH_AUTH_SCHEME` accepts `token`, `bearer`, or `basic`. This is useful when a
 gateway expects a different `Authorization` header format than GitHub’s default
 `token <value>` style. For example, JWT-backed gateways commonly need
 `GH_AUTH_SCHEME=bearer`.
 
+When `GH_GATEWAY_RUNTIME_EXCHANGE_URL` and `GH_GATEWAY_ACCESS_EXCHANGE_URL` are
+set, the CLI can resolve a short-lived gateway token directly and reuse it from
+disk cache. This allows normal `gh` commands and `gh auth git-credential` to
+work without shipping a separate platform-owned token helper.
+
 When a `gh-gateway-helper` executable is present on `PATH`, the CLI can also
-discover the gateway base URL and token automatically through helper commands.
+discover the gateway base URL and token through helper commands. This remains
+available as a compatibility path, but the preferred runtime setup is built-in
+token exchange plus standard `gh auth git-credential` wiring.
 
 This project tracks upstream GitHub CLI closely and aims to keep changes small,
 reviewable, and generally useful.
