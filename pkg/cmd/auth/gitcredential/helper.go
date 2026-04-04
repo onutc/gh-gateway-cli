@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -101,7 +102,7 @@ func helperRun(opts *CredentialOptions) error {
 		return err
 	}
 
-	if wants["protocol"] != "https" {
+	if !supportsCredentialProtocol(wants["protocol"], wants["host"]) {
 		return cmdutil.SilentError
 	}
 
@@ -135,10 +136,35 @@ func helperRun(opts *CredentialOptions) error {
 		return cmdutil.SilentError
 	}
 
-	fmt.Fprint(opts.IO.Out, "protocol=https\n")
+	fmt.Fprintf(opts.IO.Out, "protocol=%s\n", wants["protocol"])
 	fmt.Fprintf(opts.IO.Out, "host=%s\n", wants["host"])
 	fmt.Fprintf(opts.IO.Out, "username=%s\n", gotUser)
 	fmt.Fprintf(opts.IO.Out, "password=%s\n", gotToken)
 
 	return nil
+}
+
+func supportsCredentialProtocol(protocol, host string) bool {
+	switch strings.ToLower(protocol) {
+	case "https":
+		return true
+	case "http":
+		return isGatewayHTTPHost(host)
+	default:
+		return false
+	}
+}
+
+func isGatewayHTTPHost(host string) bool {
+	restBaseURL := strings.TrimSpace(os.Getenv("GH_REST_BASE_URL"))
+	if restBaseURL == "" {
+		return false
+	}
+
+	parsedURL, err := url.Parse(restBaseURL)
+	if err != nil || !strings.EqualFold(parsedURL.Scheme, "http") {
+		return false
+	}
+
+	return strings.EqualFold(parsedURL.Host, host)
 }
