@@ -44,6 +44,105 @@ func TestGraphQL(t *testing.T) {
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
 }
 
+func TestGraphQLUsesGatewayOverrideEndpoint(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+	t.Setenv("GH_REST_BASE_URL", "http://gateway.example.test/api/v3/")
+
+	response := struct {
+		Viewer struct {
+			Login string
+		}
+	}{}
+
+	http.Register(
+		httpmock.GraphQL("QUERY"),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"hubot"}}}`),
+	)
+
+	err := client.GraphQL("github.com", "QUERY", nil, &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "hubot", response.Viewer.Login)
+
+	req := http.Requests[0]
+	assert.Equal(t, "gateway.example.test", req.URL.Hostname())
+	assert.Equal(t, "http", req.URL.Scheme)
+	assert.Equal(t, "/api/graphql", req.URL.Path)
+	assert.Equal(t, features, req.Header.Get(graphqlFeatures))
+}
+
+func TestQueryPreservesLegacyGraphQLErrorShape(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	var response struct {
+		User struct {
+			ID string
+		} `graphql:"user(login: $login)"`
+		Organization struct {
+			ID string
+		} `graphql:"organization(login: $login)"`
+	}
+
+	http.Register(
+		httpmock.GraphQL(`query UserOrgOwner\b`),
+		httpmock.StringResponse(`{"data":{"user":{"id":"user-id"}},"errors":[{"type":"NOT_FOUND","path":["organization"],"message":"not found"}]}`),
+	)
+
+	err := client.Query("github.com", "UserOrgOwner", &response, map[string]interface{}{"login": "monalisa"})
+
+	var graphQLErr GraphQLError
+	assert.ErrorAs(t, err, &graphQLErr)
+	assert.Equal(t, "user-id", response.User.ID)
+	assert.True(t, graphQLErr.Match("NOT_FOUND", "organization"))
+}
+
+func TestQueryUsesGatewayOverrideEndpoint(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+	t.Setenv("GH_REST_BASE_URL", "http://gateway.example.test/api/v3/")
+
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"hubot"}}}`),
+	)
+
+	login, err := CurrentLoginName(client, "github.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "hubot", login)
+
+	req := http.Requests[0]
+	assert.Equal(t, "gateway.example.test", req.URL.Hostname())
+	assert.Equal(t, "http", req.URL.Scheme)
+	assert.Equal(t, "/api/graphql", req.URL.Path)
+	assert.Equal(t, features, req.Header.Get(graphqlFeatures))
+}
+
+func TestGraphQLNormalizesAPIHostname(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	response := struct {
+		Viewer struct {
+			Login string
+		}
+	}{}
+
+	http.Register(
+		httpmock.GraphQL("QUERY"),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"hubot"}}}`),
+	)
+
+	err := client.GraphQL("api.github.com", "QUERY", nil, &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "hubot", response.Viewer.Login)
+
+	req := http.Requests[0]
+	assert.Equal(t, "api.github.com", req.URL.Hostname())
+	assert.Equal(t, "https", req.URL.Scheme)
+	assert.Equal(t, "/graphql", req.URL.Path)
+}
+
 func TestGraphQLError(t *testing.T) {
 	reg := &httpmock.Registry{}
 	client := newTestClient(reg)
@@ -87,6 +186,43 @@ func TestRESTGetDelete(t *testing.T) {
 	r := bytes.NewReader([]byte(`{}`))
 	err := client.REST("github.com", "DELETE", "applications/CLIENTID/grant", r, nil)
 	assert.NoError(t, err)
+}
+
+func TestRESTUsesGatewayOverrideEndpoint(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+	t.Setenv("GH_REST_BASE_URL", "http://gateway.example.test/api/v3/")
+
+	http.Register(
+		httpmock.REST("GET", "api/v3/user/repos"),
+		httpmock.StatusStringResponse(200, "{}"),
+	)
+
+	err := client.REST("github.com", "GET", "user/repos", nil, nil)
+	assert.NoError(t, err)
+
+	req := http.Requests[0]
+	assert.Equal(t, "gateway.example.test", req.URL.Hostname())
+	assert.Equal(t, "http", req.URL.Scheme)
+	assert.Equal(t, "/api/v3/user/repos", req.URL.Path)
+}
+
+func TestRESTNormalizesAPIHostname(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	http.Register(
+		httpmock.REST("GET", "licenses"),
+		httpmock.StatusStringResponse(200, "{}"),
+	)
+
+	err := client.REST("api.github.com", "GET", "licenses", nil, nil)
+	assert.NoError(t, err)
+
+	req := http.Requests[0]
+	assert.Equal(t, "api.github.com", req.URL.Hostname())
+	assert.Equal(t, "https", req.URL.Scheme)
+	assert.Equal(t, "/licenses", req.URL.Path)
 }
 
 func TestRESTWithFullURL(t *testing.T) {
