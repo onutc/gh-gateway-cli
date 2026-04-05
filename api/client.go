@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,9 @@ import (
 
 	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 	ghauth "github.com/cli/go-gh/v2/pkg/auth"
+	graphql "github.com/cli/shurcooL-graphql"
+
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 const (
@@ -48,6 +52,11 @@ type HTTPError struct {
 	scopesSuggestion string
 }
 
+type graphQLHTTPResponse struct {
+	Data   interface{}              `json:"data"`
+	Errors []ghAPI.GraphQLErrorItem `json:"errors"`
+}
+
 func (err HTTPError) ScopesSuggestion() string {
 	return err.scopesSuggestion
 }
@@ -55,69 +64,123 @@ func (err HTTPError) ScopesSuggestion() string {
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
+	endpoint := ghinstance.GraphQLEndpoint(hostname)
+	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
 		return err
 	}
-	return handleResponse(gqlClient.Do(query, variables, data))
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, endpoint, bytes.NewReader(reqBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set(graphqlFeatures, features)
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		return HandleHTTPError(resp)
+	}
+
+	if resp.StatusCode == http.StatusNoContent {
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	gr := graphQLHTTPResponse{Data: data}
+	if err := json.Unmarshal(body, &gr); err != nil {
+		return err
+	}
+
+	if len(gr.Errors) > 0 {
+		return &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: gr.Errors}}
+	}
+
+	return nil
 }
 
 // Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
-	if err != nil {
-		return err
-	}
-	return handleResponse(gqlClient.Mutate(name, mutation, variables))
+	return c.MutateWithContext(context.Background(), hostname, name, mutation, variables)
 }
 
 // Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
-	if err != nil {
-		return err
-	}
-	return handleResponse(gqlClient.Query(name, query, variables))
+	return c.QueryWithContext(context.Background(), hostname, name, query, variables)
 }
 
 // QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = features
-	gqlClient, err := ghAPI.NewGraphQLClient(opts)
-	if err != nil {
-		return err
+	client := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), c.graphQLHTTPClient())
+	err := client.QueryNamed(ctx, name, query, variables)
+	var graphQLErrs graphql.Errors
+	if err != nil && errors.As(err, &graphQLErrs) {
+		items := make([]ghAPI.GraphQLErrorItem, len(graphQLErrs))
+		for i, e := range graphQLErrs {
+			items[i] = ghAPI.GraphQLErrorItem{
+				Message:    e.Message,
+				Locations:  e.Locations,
+				Path:       e.Path,
+				Extensions: e.Extensions,
+				Type:       e.Type,
+			}
+		}
+		err = &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
 	}
-	return handleResponse(gqlClient.QueryWithContext(ctx, name, query, variables))
+	return err
 }
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
-	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := ghAPI.NewRESTClient(opts)
+	req, err := http.NewRequestWithContext(context.Background(), method, restURL(hostname, p), body)
 	if err != nil {
 		return err
 	}
-	return handleResponse(restClient.Do(method, p, body, data))
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		defer resp.Body.Close()
+		return HandleHTTPError(resp)
+	}
+
+	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusResetContent {
+		return nil
+	}
+
+	defer resp.Body.Close()
+
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(payload, &data)
 }
 
 func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
-	opts := clientOptions(hostname, c.http.Transport)
-	restClient, err := ghAPI.NewRESTClient(opts)
+	req, err := http.NewRequestWithContext(context.Background(), method, restURL(hostname, p), body)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := restClient.Request(method, p, body)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -150,6 +213,51 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	}
 
 	return next, nil
+}
+
+// MutateWithContext executes a GraphQL mutation request.
+func (c Client) MutateWithContext(ctx context.Context, hostname, name string, mutation interface{}, variables map[string]interface{}) error {
+	client := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), c.graphQLHTTPClient())
+	err := client.MutateNamed(ctx, name, mutation, variables)
+	var graphQLErrs graphql.Errors
+	if err != nil && errors.As(err, &graphQLErrs) {
+		items := make([]ghAPI.GraphQLErrorItem, len(graphQLErrs))
+		for i, e := range graphQLErrs {
+			items[i] = ghAPI.GraphQLErrorItem{
+				Message:    e.Message,
+				Locations:  e.Locations,
+				Path:       e.Path,
+				Extensions: e.Extensions,
+				Type:       e.Type,
+			}
+		}
+		err = &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
+	}
+	return err
+}
+
+func restURL(hostname, pathOrURL string) string {
+	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {
+		return pathOrURL
+	}
+	return ghinstance.RESTPrefix(hostname) + pathOrURL
+}
+
+func (c Client) graphQLHTTPClient() *http.Client {
+	baseTransport := c.http.Transport
+	if baseTransport == nil {
+		baseTransport = http.DefaultTransport
+	}
+
+	client := *c.http
+	client.Transport = funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		if req.Header.Get(graphqlFeatures) == "" {
+			req.Header.Set(graphqlFeatures, features)
+		}
+		return baseTransport.RoundTrip(req)
+	}}
+
+	return &client
 }
 
 // HandleHTTPError parses a http.Response into a HTTPError.
