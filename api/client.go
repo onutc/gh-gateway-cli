@@ -365,20 +365,3 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 
 	return ""
 }
-
-func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {
-	// AuthToken, and Headers are being handled by transport,
-	// so let go-gh know that it does not need to resolve them.
-	opts := ghAPI.ClientOptions{
-		AuthToken: "none",
-		Headers: map[string]string{
-			authorization: "",
-			apiVersion:    apiVersionValue,
-		},
-		Host:               hostname,
-		SkipDefaultHeaders: true,
-		Transport:          transport,
-		LogIgnoreEnv:       true,
-	}
-	return opts
-}
