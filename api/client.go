@@ -64,7 +64,7 @@ func (err HTTPError) ScopesSuggestion() string {
 // GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	endpoint := ghinstance.GraphQLEndpoint(hostname)
+	endpoint := ghinstance.GraphQLEndpoint(ghauth.NormalizeHostname(hostname))
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 // QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
 // GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
-	client := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), c.graphQLHTTPClient())
+	client := graphql.NewClient(ghinstance.GraphQLEndpoint(ghauth.NormalizeHostname(hostname)), c.graphQLHTTPClient())
 	err := client.QueryNamed(ctx, name, query, variables)
 	var graphQLErrs graphql.Errors
 	if err != nil && errors.As(err, &graphQLErrs) {
@@ -217,7 +217,7 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 
 // MutateWithContext executes a GraphQL mutation request.
 func (c Client) MutateWithContext(ctx context.Context, hostname, name string, mutation interface{}, variables map[string]interface{}) error {
-	client := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), c.graphQLHTTPClient())
+	client := graphql.NewClient(ghinstance.GraphQLEndpoint(ghauth.NormalizeHostname(hostname)), c.graphQLHTTPClient())
 	err := client.MutateNamed(ctx, name, mutation, variables)
 	var graphQLErrs graphql.Errors
 	if err != nil && errors.As(err, &graphQLErrs) {
@@ -240,7 +240,7 @@ func restURL(hostname, pathOrURL string) string {
 	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {
 		return pathOrURL
 	}
-	return ghinstance.RESTPrefix(hostname) + pathOrURL
+	return ghinstance.RESTPrefix(ghauth.NormalizeHostname(hostname)) + pathOrURL
 }
 
 func (c Client) graphQLHTTPClient() *http.Client {

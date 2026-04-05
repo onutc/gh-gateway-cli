@@ -92,6 +92,31 @@ func TestQueryUsesGatewayOverrideEndpoint(t *testing.T) {
 	assert.Equal(t, features, req.Header.Get(graphqlFeatures))
 }
 
+func TestGraphQLNormalizesAPIHostname(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	response := struct {
+		Viewer struct {
+			Login string
+		}
+	}{}
+
+	http.Register(
+		httpmock.GraphQL("QUERY"),
+		httpmock.StringResponse(`{"data":{"viewer":{"login":"hubot"}}}`),
+	)
+
+	err := client.GraphQL("api.github.com", "QUERY", nil, &response)
+	assert.NoError(t, err)
+	assert.Equal(t, "hubot", response.Viewer.Login)
+
+	req := http.Requests[0]
+	assert.Equal(t, "api.github.com", req.URL.Hostname())
+	assert.Equal(t, "https", req.URL.Scheme)
+	assert.Equal(t, "/graphql", req.URL.Path)
+}
+
 func TestGraphQLError(t *testing.T) {
 	reg := &httpmock.Registry{}
 	client := newTestClient(reg)
@@ -154,6 +179,24 @@ func TestRESTUsesGatewayOverrideEndpoint(t *testing.T) {
 	assert.Equal(t, "gateway.example.test", req.URL.Hostname())
 	assert.Equal(t, "http", req.URL.Scheme)
 	assert.Equal(t, "/api/v3/user/repos", req.URL.Path)
+}
+
+func TestRESTNormalizesAPIHostname(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	http.Register(
+		httpmock.REST("GET", "licenses"),
+		httpmock.StatusStringResponse(200, "{}"),
+	)
+
+	err := client.REST("api.github.com", "GET", "licenses", nil, nil)
+	assert.NoError(t, err)
+
+	req := http.Requests[0]
+	assert.Equal(t, "api.github.com", req.URL.Hostname())
+	assert.Equal(t, "https", req.URL.Scheme)
+	assert.Equal(t, "/licenses", req.URL.Path)
 }
 
 func TestRESTWithFullURL(t *testing.T) {
