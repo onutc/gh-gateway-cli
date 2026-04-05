@@ -20,6 +20,7 @@ require (
 	github.com/cli/go-internal v0.0.0-20241025142207-6c48bcd5ce24
 	github.com/cli/oauth v1.2.2
 	github.com/cli/safeexec v1.0.1
+	github.com/cli/shurcooL-graphql v0.0.4
 	github.com/cpuguy83/go-md2man/v2 v2.0.7
 	github.com/creack/pty v1.1.24
 	github.com/digitorus/timestamp v0.0.0-20250524132541-c45532741eea
@@ -86,7 +87,6 @@ require (
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
 	github.com/cli/browser v1.3.0 // indirect
-	github.com/cli/shurcooL-graphql v0.0.4 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.18.2 // indirect
