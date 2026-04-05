@@ -145,6 +145,30 @@ func gatewayBaseURL() string {
 	return ""
 }
 
+func hostFromRawURL(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(parsed.Host)
+}
+
+func Host() string {
+	if explicit := trimmedEnv(envRestBaseURL, envAPIBaseURL); explicit != "" {
+		return hostFromRawURL(explicit)
+	}
+	if explicit := trimmedEnv(envGraphQLBaseURL); explicit != "" {
+		return hostFromRawURL(explicit)
+	}
+	if explicit := trimmedEnv(envBrowserBaseURL); explicit != "" {
+		return hostFromRawURL(explicit)
+	}
+	if baseURL := gatewayBaseURL(); baseURL != "" {
+		return hostFromRawURL(baseURL)
+	}
+	return ""
+}
+
 func RESTBaseURL() string {
 	if explicit := trimmedEnv(envRestBaseURL, envAPIBaseURL); explicit != "" {
 		return ensureTrailingSlash(explicit)
@@ -191,4 +215,13 @@ func ActiveToken() (string, string) {
 		return token, envGatewayHelper
 	}
 	return "", ""
+}
+
+func IsReadOnlyTokenSource(source string) bool {
+	switch strings.TrimSpace(source) {
+	case envTokenCommand, envGatewayHelper, envRuntimeExchangeURL:
+		return true
+	default:
+		return false
+	}
 }

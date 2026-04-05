@@ -289,6 +289,30 @@ func Test_statusRun(t *testing.T) {
 			`),
 		},
 		{
+			name: "gateway token command",
+			opts: StatusOptions{},
+			env: map[string]string{
+				"GH_REST_BASE_URL": "http://gateway.internal/api/v3/",
+				"GH_TOKEN_COMMAND": "printf gho_abc123",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "api/v3/"),
+					httpmock.ScopesResponder(""))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"monalisa"}}}`))
+			},
+			wantOut: heredoc.Doc(`
+				gateway.internal
+				  ✓ Logged in to gateway.internal account monalisa (GH_TOKEN_COMMAND)
+				  - Active account: true
+				  - Git operations protocol: https
+				  - Token: gho_******
+				  - Token scopes: none
+			`),
+		},
+		{
 			name: "server-to-server token",
 			opts: StatusOptions{},
 			cfgStubs: func(t *testing.T, c gh.Config) {
@@ -759,6 +783,13 @@ func Test_statusRun(t *testing.T) {
 			require.Equal(t, tt.wantOut, output)
 		})
 	}
+}
+
+func Test_authTokenWriteable(t *testing.T) {
+	require.True(t, authTokenWriteable("oauth_token"))
+	require.False(t, authTokenWriteable("GH_TOKEN"))
+	require.False(t, authTokenWriteable("GH_TOKEN_COMMAND"))
+	require.False(t, authTokenWriteable("GH_GATEWAY_RUNTIME_EXCHANGE_URL"))
 }
 
 func login(t *testing.T, c gh.Config, hostname, username, token, protocol string) {

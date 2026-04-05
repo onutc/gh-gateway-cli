@@ -196,6 +196,15 @@ func TestHostsIncludesEnvVar(t *testing.T) {
 	require.Contains(t, hosts, "ghe.io")
 }
 
+func TestHostsIncludesGatewayHostWhenGatewayBaseURLConfigured(t *testing.T) {
+	authCfg := newTestAuthConfig(t)
+	t.Setenv("GH_REST_BASE_URL", "http://gateway.internal/api/v3/")
+
+	hosts := authCfg.Hosts()
+
+	require.Contains(t, hosts, "gateway.internal")
+}
+
 func TestDefaultHostFromEnvVar(t *testing.T) {
 	// Given the GH_HOST env var is set
 	authCfg := newTestAuthConfig(t)
