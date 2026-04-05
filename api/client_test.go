@@ -71,6 +71,32 @@ func TestGraphQLUsesGatewayOverrideEndpoint(t *testing.T) {
 	assert.Equal(t, features, req.Header.Get(graphqlFeatures))
 }
 
+func TestQueryPreservesLegacyGraphQLErrorShape(t *testing.T) {
+	http := &httpmock.Registry{}
+	client := newTestClient(http)
+
+	var response struct {
+		User struct {
+			ID string
+		} `graphql:"user(login: $login)"`
+		Organization struct {
+			ID string
+		} `graphql:"organization(login: $login)"`
+	}
+
+	http.Register(
+		httpmock.GraphQL(`query UserOrgOwner\b`),
+		httpmock.StringResponse(`{"data":{"user":{"id":"user-id"}},"errors":[{"type":"NOT_FOUND","path":["organization"],"message":"not found"}]}`),
+	)
+
+	err := client.Query("github.com", "UserOrgOwner", &response, map[string]interface{}{"login": "monalisa"})
+
+	var graphQLErr GraphQLError
+	assert.ErrorAs(t, err, &graphQLErr)
+	assert.Equal(t, "user-id", response.User.ID)
+	assert.True(t, graphQLErr.Match("NOT_FOUND", "organization"))
+}
+
 func TestQueryUsesGatewayOverrideEndpoint(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := newTestClient(http)

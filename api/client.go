@@ -102,7 +102,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 	}
 
 	if len(gr.Errors) > 0 {
-		return &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: gr.Errors}}
+		return GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: gr.Errors}}
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func (c Client) QueryWithContext(ctx context.Context, hostname, name string, que
 				Type:       e.Type,
 			}
 		}
-		err = &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
+		err = GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
 	}
 	return err
 }
@@ -231,7 +231,7 @@ func (c Client) MutateWithContext(ctx context.Context, hostname, name string, mu
 				Type:       e.Type,
 			}
 		}
-		err = &GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
+		err = GraphQLError{GraphQLError: &ghAPI.GraphQLError{Errors: items}}
 	}
 	return err
 }
