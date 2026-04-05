@@ -325,7 +325,13 @@ func (c *AuthConfig) Hosts() []string {
 	if c.hostsOverride != nil {
 		return c.hostsOverride()
 	}
-	return ghauth.KnownHosts()
+
+	hosts := slices.Clone(ghauth.KnownHosts())
+	if gatewayHost := gatewayconfig.Host(); gatewayHost != "" && !slices.Contains(hosts, gatewayHost) {
+		hosts = append(hosts, gatewayHost)
+	}
+
+	return hosts
 }
 
 // SetHosts will override any hosts resolution and return the given

@@ -12,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/gatewayconfig"
 	"github.com/cli/cli/v2/internal/gh"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -410,5 +411,5 @@ func buildEntry(httpClient *http.Client, opts buildEntryOptions) authEntry {
 }
 
 func authTokenWriteable(src string) bool {
-	return !strings.HasSuffix(src, "_TOKEN")
+	return !strings.HasSuffix(src, "_TOKEN") && !gatewayconfig.IsReadOnlyTokenSource(src)
 }
